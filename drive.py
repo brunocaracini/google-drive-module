@@ -20,11 +20,12 @@ def google_api_service_creator(func):
 class GoogleDrive():
 
     scope = 'https://www.googleapis.com/auth/drive'
-    key_file_location = 'authtest-325214-395d7e2e3db1.json'
+    key_file_location = 'google-drive-module/authtest-325214-f25670186971.json'
 
     @staticmethod
     def _get_service(api_name, api_version, scopes, key_file_location):
-        """Get a service that communicates to a Google API.
+        """
+        Get a service that communicates to a Google API.
 
         Args:
             api_name: The name of the api to connect to.
@@ -35,7 +36,6 @@ class GoogleDrive():
         Returns:
             A service that is connected to the specified API.
         """
-
         credentials = service_account.Credentials.from_service_account_file(
         key_file_location)
 
@@ -48,16 +48,27 @@ class GoogleDrive():
 
     @staticmethod
     @google_api_service_creator
-    def list_files(service):
-        """Shows basic usage of the Drive v3 API.
-        Prints the names and ids of the first 10 files the user has access to.
+    def list_files(service, folder_id: str = None, path: str = None, limit: int = None):
+        """Prints the names, IDs, and paths of the files the user has access to.
+
+        Args:
+            service: Authenticated service instance of the GoogleAPI Client.
+            folder_id: ID of the folder to list files from.
+            path: Path of the folder to list files from.
+            limit: Maximum number of files to list.
+
+        Returns:
+            None
         """
-
-
         try:
+            query = ""
+            if folder_id:
+                query = f"'{folder_id}' in parents"
+            elif path:
+                query = f"mimeType='application/vnd.google-apps.folder' and trashed = false and fullText contains '{path}'"
 
             # Call the Drive v3 API
-            results = service.files().list().execute()
+            results = service.files().list(q=query,fields="nextPageToken, files(id, name, parents, mimeType)").execute()
             items = results.get('files', [])
 
             if not items:
@@ -65,22 +76,27 @@ class GoogleDrive():
                 return
             print('Files:')
             for item in items:
-                print(u'{0} ({1})'.format(item['name'], item['id']))
+                item['path'] = GoogleDrive.get_file_path(file_id=item['id'])
+                print(item)
+                if limit and len(items)>=limit:
+                    break
+            return items
         except HttpError as error:
             # TODO(developer) - Handle errors from drive API.
             print(f'An error occurred: {error}')
 
     @staticmethod
     @google_api_service_creator
-    def create_folder(service):
-        """ Create a folder and prints the folder ID
-        Returns : Folder Id
+    def create_folder(service, folder_id: str = None, path: str = None):
+        """Creates a folder under the given Folder ID or Path, and prints 
+        new the folder ID.
+        
+        Args:
+           service: Authenticated service instance of the GoogleAPI Client.
 
-        Load pre-authorized user credentials from the environment.
-        TODO(developer) - See https://developers.google.com/identity
-        for guides on implementing OAuth2 for the application.
+        Returns : 
+            Folder Id.
         """
-
         try:
             # create drive api client
             file_metadata = {
@@ -100,23 +116,24 @@ class GoogleDrive():
 
     @staticmethod
     @google_api_service_creator
-    def upload_to_folder(service,folder_id):
-        """Upload a file to the specified folder and prints file ID, folder ID
-        Args: Id of the folder
-        Returns: ID of the file uploaded
-
-        Load pre-authorized user credentials from the environment.
-        TODO(developer) - See https://developers.google.com/identity
-        for guides on implementing OAuth2 for the application.
+    def upload_to_folder(service, local_filepath: str, folder_id: str, path: str, filename: str):
+        """Uploads a file to the specified folder and prints file ID, folder ID.
+        
+        Args: 
+            service: Authenticated service instance of the GoogleAPI Client.
+            local_filepath: Local path of the file to be uploaded.
+            folder_id: Id of the folder.
+            filename: Name that the file will have once it's uploaded.
+        
+        Returns: 
+            ID of the file uploaded.
         """
-
         try:
-
             file_metadata = {
-                'name': 'Albero Genealogico - FAMIGLIA CARACINI.pdf',
+                'name': filename,
                 'parents': [folder_id]
             }
-            media = MediaFileUpload('Albero Genealogico - FAMIGLIA CARACINI.pdf',
+            media = MediaFileUpload(local_filepath,
                                     mimetype='application/pdf', resumable=True)
             # pylint: disable=maybe-no-member
             file = service.files().create(body=file_metadata, media_body=media,
@@ -130,21 +147,17 @@ class GoogleDrive():
 
     @staticmethod
     @google_api_service_creator
-    def download_file(service, real_file_id):
-        """Downloads a file
+    def download_file_by_id(service, file_id: str):
+        """Downloads a file based on file ID.
+        
         Args:
-            real_file_id: ID of the file to download
-        Returns : IO object with location.
-
-        Load pre-authorized user credentials from the environment.
-        TODO(developer) - See https://developers.google.com/identity
-        for guides on implementing OAuth2 for the application.
+            service: Authenticated service instance of the GoogleAPI Client.
+            file_id: ID of the file to download.
+        
+        Returns: 
+            IO object with location.
         """
-
         try:
-            # create drive api client
-            file_id = real_file_id
-
             # pylint: disable=maybe-no-member
             request = service.files().get_media(fileId=file_id)
             file = io.BytesIO()
@@ -162,10 +175,66 @@ class GoogleDrive():
             f.write(file.getvalue())
         return file.getvalue()
 
+    def download_file_by_path(service, file_path: str, save_file: bool = False, local_save_path: str = ''):
+        """Downloads a file based on file path.
+
+        Args:
+            service: Authenticated service instance of the GoogleAPI Client.
+            file_path: path of the file to download.
+
+        Returns:
+            IO object with location.
+        """
+
+        try:
+            query = "mimeType='application/pdf' and trashed = false and parents in '"+file_path+"'"
+            results = service.files().list(q=query,fields="nextPageToken, files(id, name)").execute()
+            items = results.get("files", [])
+
+            if not items:
+                print('No files found.')
+                return None
+            else:
+                file_id = items[0]['id']
+                request = service.files().get_media(fileId=file_id)
+                file = io.BytesIO()
+                downloader = MediaIoBaseDownload(file, request)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
+                    print(F'Download {int(status.progress() * 100)}.')
+                
+                if save_file:
+                    with open(local_save_path, 'wb') as f:
+                        f.write(file.getvalue())
+        except HttpError as error:
+            print(F'An error occurred: {error}')
+            file = None
+
+        return file.getvalue()
+
+    @staticmethod
+    @google_api_service_creator
+    def get_file_path(service, file_id = '1hNV7wJrLQOBKPCwSQ0sPdSwKiW0ziauo', path='', name='', recursive_call: bool = False):
+        file = service.files().get(fileId=file_id, fields='parents, name').execute()
+        parents = file.get('parents')
+        name = file.get('name') if not recursive_call else name
+        if parents:
+            parent_id = parents[0]
+            parent_folder = service.files().get(fileId=parent_id, fields='name').execute()
+            parent_name = parent_folder.get('name')
+            path = parent_name + '/' + path
+            return GoogleDrive.get_file_path(parent_id, path, name = name, recursive_call = True)
+        else:
+            if path == '':
+                return file.get('name') if recursive_call else 'Shared/' + file.get('name')
+            else:
+                return path + name
 
 if __name__ == '__main__':
     #create_folder(service=service)
     #upload_to_folder(service=service,folder_id='1pEJH86DPB9tn7P35j44vjVSATWdKk7IN')
+    #print(GoogleDrive.get_file_path())
     GoogleDrive.list_files()
     #print(download_file(service=service, real_file_id='19C0uPItXL4OowN_j-9YEDGnF8aZ7ua7j'))
 
