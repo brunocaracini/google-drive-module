@@ -7,6 +7,7 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 def google_api_service_creator(func):
     def wrapper(*args, **kwargs):
+        # Authenticates and constructs service.
         service = GoogleDrive._get_service(
             api_name='drive',
             api_version='v3',
@@ -161,7 +162,6 @@ class GoogleDrive():
             f.write(file.getvalue())
         return file.getvalue()
 
-# Authenticate and construct service.
 
 if __name__ == '__main__':
     #create_folder(service=service)
