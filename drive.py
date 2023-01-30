@@ -20,7 +20,7 @@ def google_api_service_creator(func):
 class GoogleDrive():
 
     scope = 'https://www.googleapis.com/auth/drive'
-    key_file_location = 'google-drive-module/authtest-325214-f25670186971.json'
+    key_file_location = 'google-drive-module/authtest-325214-191d2ccd76e3.json'
 
     @staticmethod
     def _get_service(api_name, api_version, scopes, key_file_location):
@@ -74,9 +74,12 @@ class GoogleDrive():
             if not items:
                 print('No files found.')
                 return
+            
+            parents = set([item['parents'][0] for item in items if 'parents' in item.keys()])
+            print(parents)
             print('Files:')
             for item in items:
-                item['path'] = GoogleDrive.get_file_path(file_id=item['id'])
+                item['path'] = GoogleDrive.get_file_directory(file_id=item['id'])
                 print(item)
                 if limit and len(items)>=limit:
                     break
@@ -88,7 +91,8 @@ class GoogleDrive():
     @staticmethod
     @google_api_service_creator
     def create_folder(service, folder_id: str = None, path: str = None):
-        """Creates a folder under the given Folder ID or Path, and prints 
+        """
+        Creates a folder under the given Folder ID or Path, and prints 
         new the folder ID.
         
         Args:
@@ -187,7 +191,7 @@ class GoogleDrive():
         """
 
         try:
-            query = "mimeType='application/pdf' and trashed = false and parents in '"+file_path+"'"
+            query = "mimeType='application/pdf' and trashed = false and parents in '" + file_path + "'"
             results = service.files().list(q=query,fields="nextPageToken, files(id, name)").execute()
             items = results.get("files", [])
 
@@ -215,7 +219,7 @@ class GoogleDrive():
 
     @staticmethod
     @google_api_service_creator
-    def get_file_path(service, file_id = '1hNV7wJrLQOBKPCwSQ0sPdSwKiW0ziauo', path='', name='', recursive_call: bool = False):
+    def get_file_path(service, file_id = '1hNV7wJrLQOBKPCwSQ0sPdSwKiW0ziauo', path='', name='', get_file_name: str = False, recursive_call: bool = False):
         file = service.files().get(fileId=file_id, fields='parents, name').execute()
         parents = file.get('parents')
         name = file.get('name') if not recursive_call else name
@@ -231,10 +235,29 @@ class GoogleDrive():
             else:
                 return path + name
 
+    @staticmethod
+    @google_api_service_creator
+    def get_file_directory(service, file_id = '1hNV7wJrLQOBKPCwSQ0sPdSwKiW0ziauo', path='', name='', get_file_name: str = False, recursive_call: bool = False):
+        file = service.files().get(fileId=file_id, fields='parents, name').execute()
+        parents = file.get('parents')
+        if parents:
+            parent_id = parents[0]
+            parent_folder = service.files().get(fileId=parent_id, fields='name').execute()
+            parent_name = parent_folder.get('name')
+            path = parent_name + '/' + path
+            return GoogleDrive.get_file_path(parent_id, path, name = name, recursive_call = True)
+        else:
+            if path == '':
+                return file.get('name') if recursive_call else 'Shared/'
+            else:
+                return path
+
+
 if __name__ == '__main__':
     #create_folder(service=service)
     #upload_to_folder(service=service,folder_id='1pEJH86DPB9tn7P35j44vjVSATWdKk7IN')
     #print(GoogleDrive.get_file_path())
-    GoogleDrive.list_files()
+    #GoogleDrive.download_file_by_id('1hNV7wJrLQOBKPCwSQ0sPdSwKiW0ziauo')
+    GoogleDrive.download_file_by_id(file_id='1kmrqadbgTa_fApL36zXcSpQvalDWsHLd')
     #print(download_file(service=service, real_file_id='19C0uPItXL4OowN_j-9YEDGnF8aZ7ua7j'))
 
