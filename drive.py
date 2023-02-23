@@ -12,6 +12,8 @@ class GoogleDrive():
 
     MY_DRIVE_FOLDER_ID = '0ALCSEBNluoFTUk9PVA'
 
+    #Decorators:
+
     def google_api_service_creator(func):
         def wrapper(*args, **kwargs):
             # Authenticates and constructs service.
@@ -23,6 +25,35 @@ class GoogleDrive():
             result = func(service, *args, **kwargs)
             return result
         return wrapper
+
+    def logger(func):
+        def wrapper(*args, **kwargs):
+            # Authenticates and constructs service.
+            import logging
+
+            # Set up the logger
+            logger = logging.getLogger('Google Drive Module')
+            logger.setLevel(logging.INFO)
+
+            # Create a file handler
+            '''handler = logging.FileHandler('mylogfile.log')
+            handler.setLevel(logging.INFO)'''
+
+            # Create a console handler
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.INFO)
+
+            # Create a formatter
+            formatter = logging.Formatter('%(name)s - %(asctime)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+
+            # Add the handler to the logger
+            logger.addHandler(handler)
+            result = func(logger=logger, *args, **kwargs)
+            return result
+        return wrapper
+
+    #Private methods:
 
     @staticmethod
     def _get_service(api_name, api_version, scopes, key_file_location):
@@ -47,57 +78,6 @@ class GoogleDrive():
 
         return service
 
-    @staticmethod
-    @google_api_service_creator
-    def list_files(service, folder_id: str = None, path: str = None, limit: int = None, calculate_paths: bool = False):
-        """Prints the names, IDs, and paths of the files the user has access to.
-
-        Args:
-            service: Authenticated service instance of the GoogleAPI Client.
-            folder_id: ID of the folder to list files from.
-            path: Path of the folder to list files from.
-            limit: Maximum number of files to list.
-
-        Returns:
-            None
-        """
-        try:
-            query = ""
-            if folder_id:
-                query = f"'{folder_id}' in parents"
-    
-            # Call the Drive v3 API
-            results = service.files().list(q=query,fields="nextPageToken, files(id, name, parents, mimeType)").execute()
-            items = results.get('files', [])
-
-            if not items:
-                print('No files found.')
-                return
-            
-            if calculate_paths:
-                #parents = set([item['parents'][0] for item in items if 'parents' in item.keys()])
-                #parents = {parent: GoogleDrive.get_file_path(file_id=parent) for parent in parents}
-
-                child_parents = {item['id']:item['parents'] if 'parents' in item.keys() else [] for item in items}
-                item_names = {item['id']:item['name'] for item in items}
-                item_names[GoogleDrive.MY_DRIVE_FOLDER_ID] = 'My Drive'
-                #TODO: rebuild calculate_path
-            for item in items:
-                item['type'] = 'folder' if 'folder' in item['mimeType'] else 'file'
-                if calculate_paths:
-                    #item['path'] = f"{parents[item['parents'][0]]}/{item['name']}{'/' if item['type'] == 'folder' else ''}" if 'parents' in item.keys() and item['parents'][0] in parents.keys() else None
-                    item['path'] = f"{GoogleDrive._calculate_path(child_parents = child_parents, item_id = item['id'], item_names=item_names, path_type='names')}{'' if item['type'] == 'file' else '/'}" 
-                    
-                    print('*'*50)
-                    print(item['name'])
-                    print(item['path'])
-                if limit and len(items)>=limit:
-                    break
-            return items
-        except HttpError as error:
-            # TODO(developer) - Handle errors from drive API.
-            print(f'An error occurred: {error}')
-
     def _calculate_path(child_parents, item_id = None, item_names = None, path_type = 'names', recursive_call = False, path = '', ):
         if not recursive_call:
             path = item_id
@@ -114,6 +94,64 @@ class GoogleDrive():
         for parent in parents:
             names_path += f"{item_names[parent]}/"
         return names_path.rstrip('/')
+
+    @staticmethod
+    @logger
+    @google_api_service_creator
+    def get_files(service, logger, item_type: str = None, folder_id: str = None, path: str = None, limit: int = None, calculate_paths: bool = False):
+        """Returns the names, IDs, and paths of the files the user has access to.
+
+        Args:
+            service: Authenticated service instance of the Google API Client.
+            logger: Logger instance for Google Drive Module.
+            item_type: Type of files allowed.
+            folder_id: ID of the folder to list files from.
+            path: Path of the folder to list files from.
+            limit: Maximum number of files to list.
+
+        Returns:
+            None
+        """
+        try:
+            logger.info('Starting get files process')
+
+            #Applying query filters
+            logger.info('Applying given filters')
+            query = ""
+            if folder_id:
+                query = f"'{folder_id}' in parents"
+    
+            # Call the Drive v3 API
+            logger.info('Calling Drive API V3')
+            results = service.files().list(q=query,fields="nextPageToken, files(id, name, parents, mimeType)").execute()
+            items = results.get('files', [])
+            if not items:
+                logger.warning('No items found with the given parameters')
+                return []
+            
+            #Preparing for path calculation
+            if calculate_paths or path:
+                logger.info('Preparing bases for path calculation')
+                child_parents = {item['id']:item['parents'] if 'parents' in item.keys() else [] for item in items}
+                item_names = {item['id']:item['name'] for item in items}
+                item_names[GoogleDrive.MY_DRIVE_FOLDER_ID] = 'My Drive'
+
+
+            logger.info('Calculating paths')
+            logger.info('Infering item types')
+            for item in items:
+                item['type'] = 'folder' if 'folder' in item['mimeType'] else 'file'
+                if calculate_paths:
+                    #item['path'] = f"{parents[item['parents'][0]]}/{item['name']}{'/' if item['type'] == 'folder' else ''}" if 'parents' in item.keys() and item['parents'][0] in parents.keys() else None
+                    item['path'] = f"{GoogleDrive._calculate_path(child_parents = child_parents, item_id = item['id'], item_names=item_names, path_type='names')}{'' if item['type'] == 'file' else '/'}" 
+                if limit and len(items)>=limit:
+                    break
+            logger.info('Get files process has successfuly finished')
+            return items
+        except Exception as error:
+            # TODO(developer) - Handle errors from drive API.
+            logger.error('Get files process has failed')
+            logger.error(f'Error message: {str(error)}')
 
     @staticmethod
     @google_api_service_creator
@@ -313,5 +351,5 @@ if __name__ == '__main__':
     #GoogleDrive.download_file_by_id('1hNV7wJrLQOBKPCwSQ0sPdSwKiW0ziauo')
     #GoogleDrive.download_file_by_id(file_id='1kmrqadbgTa_fApL36zXcSpQvalDWsHLd')
     #print(download_file(service=service, real_file_id='19C0uPItXL4OowN_j-9YEDGnF8aZ7ua7j'))
-    GoogleDrive.list_files(calculate_paths=True)
+    GoogleDrive.get_files(calculate_paths=True)
     
