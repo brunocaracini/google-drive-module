@@ -475,7 +475,7 @@ if __name__ == "__main__":
     # GoogleDrive.download_file_by_id(file_id='1kmrqadbgTa_fApL36zXcSpQvalDWsHLd')
     # print(download_file(service=service, real_file_id='19C0uPItXL4OowN_j-9YEDGnF8aZ7ua7j'))
     files = GoogleDrive.get_files(
-        calculate_paths=True, path="Tarjetas de Crédito/1. VISA - Santander/"
+        calculate_paths=True, path="Tarjetas de Crédito/1. VISA - Santander/", item_type="file"
     )
     print(len(files))
     for file in files:
