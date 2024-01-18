@@ -465,6 +465,21 @@ class GoogleDrive:
                 return file.get("name")
             else:
                 return path
+    
+    @logging
+    @google_api_service_creator
+    def download_file_content_bytes_by_id(service, logger, file_id: str):
+        """Retrieves the file content as bytes using a streaming approach."""
+        request = service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+            logger.info("Download %d%%." % int(status.progress() * 100))
+
+        fh.seek(0)  # Rewind the buffer to the beginning
+        return fh.read()  # Read the entire file content into memory
 
 
 if __name__ == "__main__":
@@ -479,4 +494,4 @@ if __name__ == "__main__":
     )
     print(len(files))
     for file in files:
-        print(file["path"], file["type"])
+        print(file)
