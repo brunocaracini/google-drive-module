@@ -470,15 +470,17 @@ class GoogleDrive:
     @google_api_service_creator
     def download_file_content_bytes_by_id(service, logger, file_id: str):
         """Retrieves the file content as bytes using a streaming approach."""
+        logger.info("Download file content process has started")
         request = service.files().get_media(fileId=file_id)
         fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, request)
         done = False
         while done is False:
             status, done = downloader.next_chunk()
-            logger.info("Download %d%%." % int(status.progress() * 100))
+            logger.info("Downloading file - %d%% completed" % int(status.progress() * 100))
 
         fh.seek(0)  # Rewind the buffer to the beginning
+        logger.info("Download file content process has successfuly finished")
         return fh.read()  # Read the entire file content into memory
 
 
