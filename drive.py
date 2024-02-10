@@ -1,15 +1,20 @@
 import io
+import os
+from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.oauth2 import service_account
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
+load_dotenv()
 
 class GoogleDrive:
+    # Authentication and scopes
     scope = "https://www.googleapis.com/auth/drive"
-    key_file_location = "credit-cards-automation-7034849bd49b.json"
+    key_file_location = os.getenv("GOOGLE_DRIVE_KEY_FILE_LOCATION")
 
-    MY_DRIVE_FOLDER_ID = "0AFoAJwxmuRzuUk9PVA"
+    # Config
+    MY_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_MY_DRIVE_FOLDER_ID")
     ITEM_TYPES = {"folder": "application/vnd.google-apps.folder", "file": ""}
 
     # Decorators:
