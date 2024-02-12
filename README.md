@@ -32,7 +32,7 @@ To use the Google Drive Python Module in your project, follow these steps:
 2. Import the module into your Python script:
 
     ```python
-    from drive import GoogleDrive
+    from google_drive import GoogleDrive
     ```
 
 ## Usage
