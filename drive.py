@@ -1,5 +1,6 @@
 import io
 import os
+import logging
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -36,28 +37,24 @@ class GoogleDrive:
     def logging(func):
         def wrapper(*args, **kwargs):
             # Authenticates and constructs service.
-            import logging
-
             # Set up the logger
             logger = logging.getLogger("Google Drive Module")
             logger.setLevel(logging.INFO)
 
-            # Create a file handler
-            """handler = logging.FileHandler('mylogfile.log')
-            handler.setLevel(logging.INFO)"""
+            # Check if handler already exists
+            if not logger.handlers:
+                # Create a console handler
+                handler = logging.StreamHandler()
+                handler.setLevel(logging.INFO)
 
-            # Create a console handler
-            handler = logging.StreamHandler()
-            handler.setLevel(logging.INFO)
+                # Create a formatter
+                formatter = logging.Formatter(
+                    "%(name)s - %(asctime)s - %(levelname)s - %(message)s"
+                )
+                handler.setFormatter(formatter)
 
-            # Create a formatter
-            formatter = logging.Formatter(
-                "%(name)s - %(asctime)s - %(levelname)s - %(message)s"
-            )
-            handler.setFormatter(formatter)
-
-            # Add the handler to the logger
-            logger.addHandler(handler)
+                # Add the handler to the logger
+                logger.addHandler(handler)
             result = func(logger, *args, **kwargs)
             return result
 
