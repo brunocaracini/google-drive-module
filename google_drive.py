@@ -488,15 +488,8 @@ class GoogleDrive:
 
 
 if __name__ == "__main__":
-    # create_folder(service=service)
-    # GoogleDrive.upload_basic()
-    # print(GoogleDrive.get_file_path())
-    # GoogleDrive.download_file_by_id('1hNV7wJrLQOBKPCwSQ0sPdSwKiW0ziauo')
-    # GoogleDrive.download_file_by_id(file_id='1kmrqadbgTa_fApL36zXcSpQvalDWsHLd')
-    # print(download_file(service=service, real_file_id='19C0uPItXL4OowN_j-9YEDGnF8aZ7ua7j'))
     files = GoogleDrive.get_files(
-        calculate_paths=True, item_type="files"
+        calculate_paths=True, item_type="files", path="Tarjetas de Crédito/7. VISA - HSBC/"
     )
-    print(len(files))
     for file in files:
         print(file)
